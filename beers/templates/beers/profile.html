@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}{{ profile.user.username }} — BeerPass{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <div class="container">
+    <h1 class="display-5 fw-bold">{{ profile.user.username }}</h1>
+    <p class="lead text-muted-beer mb-0">{{ profile.bio|default:"Beer explorer." }}</p>
+  </div>
+</div>
+
+<div class="container">
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ profile.total_checkins }}</div>
+        <div class="stat-label">Beers tried</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ profile.unique_styles }}</div>
+        <div class="stat-label">Styles tried</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ profile.unique_countries }}</div>
+        <div class="stat-label">Countries</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ passport_percent }}%</div>
+        <div class="stat-label">Passport progress</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-2">
+            <h5 class="mb-0">Beer Passport</h5>
+            <span class="text-muted-beer">{{ styles_tried }} / {{ total_styles }} styles</span>
+          </div>
+          <div class="progress mb-3">
+            <div class="progress-bar" style="width: {{ passport_percent }}%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <h5 class="mb-3">Recent check-ins</h5>
+      {% for c in checkins %}
+        <a href="{% url 'beer_detail' c.beer.pk %}" class="card mb-2 text-decoration-none">
+          <div class="card-body py-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <strong style="color: var(--text);">{{ c.beer.name }}</strong>
+                <small class="text-muted-beer ms-2">{{ c.beer.brewery.name }}</small>
+                <div>
+                  <span class="badge badge-style mt-1">{{ c.beer.style.name }}</span>
+                </div>
+              </div>
+              <div class="text-end">
+                {% for i in "12345" %}
+                  {% if forloop.counter <= c.rating %}<span class="star">★</span>{% else %}<span class="star-empty">★</span>{% endif %}
+                {% endfor %}
+                <div><small class="text-muted-beer">{{ c.created_at|date:"M j, Y" }}</small></div>
+              </div>
+            </div>
+            {% if c.notes %}<p class="mb-0 mt-2 text-muted-beer" style="font-size: 0.9rem;">"{{ c.notes }}"</p>{% endif %}
+          </div>
+        </a>
+      {% empty %}
+        <p class="text-muted-beer">No check-ins yet. <a href="{% url 'beer_list' %}">Start exploring →</a></p>
+      {% endfor %}
+    </div>
+
+    <div class="col-md-4">
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="mb-3">🏆 Challenges</h5>
+          {% for item in challenges %}
+            <div class="mb-3">
+              <div class="d-flex justify-content-between mb-1">
+                <strong>{{ item.challenge.icon }} {{ item.challenge.name }}</strong>
+                <small class="text-muted-beer">{{ item.current }}/{{ item.required }}</small>
+              </div>
+              <div class="progress mb-1">
+                <div class="progress-bar" style="width: {{ item.percent }}%;"></div>
+              </div>
+              <small class="text-muted-beer">{{ item.challenge.description }}</small>
+              {% if item.completed %}<span class="badge badge-tried ms-2">Complete ✓</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if style_breakdown %}
+        <div class="card">
+          <div class="card-body">
+            <h5 class="mb-3">Your top styles</h5>
+            {% for s in style_breakdown %}
+              <div class="d-flex justify-content-between py-2 border-bottom" style="border-color: var(--border) !important;">
+                <span>{{ s.beer__style__name }}</span>
+                <span><strong class="text-muted-beer">{{ s.count }}</strong> <small class="text-muted-beer">({{ s.avg|floatformat:1 }}★)</small></span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

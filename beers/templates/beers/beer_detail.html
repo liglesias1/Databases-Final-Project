@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}{{ beer.name }} — BeerPass{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-8">
+      <h1 class="fw-bold">{{ beer.name }}</h1>
+      <p class="lead"><a href="#" style="color: var(--muted);">{{ beer.brewery.name }}</a></p>
+      <div class="mb-3">
+        <a href="{% url 'style_detail' beer.style.pk %}" class="badge badge-style" style="font-size: 0.95rem;">{{ beer.style.name }}</a>
+        {% if beer.avg_rating %}
+          <span class="ms-2">
+            {% for i in "12345" %}
+              {% if forloop.counter <= beer.avg_rating %}<span class="star">★</span>{% else %}<span class="star-empty">★</span>{% endif %}
+            {% endfor %}
+            <span class="ms-2" style="color: var(--accent);">{{ beer.avg_rating|floatformat:2 }}</span>
+          </span>
+        {% endif %}
+      </div>
+
+      <div class="row mb-4">
+        <div class="col-3">
+          <div class="stat-block text-center">
+            <div class="stat-number">{{ beer.abv|default:"—" }}%</div>
+            <div class="stat-label">ABV</div>
+          </div>
+        </div>
+        <div class="col-3">
+          <div class="stat-block text-center">
+            <div class="stat-number">{{ beer.ibu_range }}</div>
+            <div class="stat-label">IBU</div>
+          </div>
+        </div>
+        <div class="col-3">
+          <div class="stat-block text-center">
+            <div class="stat-number">{{ beer.checkins.count }}</div>
+            <div class="stat-label">Check-ins</div>
+          </div>
+        </div>
+        <div class="col-3">
+          <div class="stat-block text-center">
+            <div class="stat-number">{{ beer.avg_rating|floatformat:1|default:"—" }}</div>
+            <div class="stat-label">Rating</div>
+          </div>
+        </div>
+      </div>
+
+      {% if beer.description %}
+        <div class="card mb-4">
+          <div class="card-body">
+            <h6 class="text-muted-beer">About this beer</h6>
+            <p class="mb-0">{{ beer.description|truncatewords:80 }}</p>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h6 class="text-muted-beer mb-3">Flavor profile</h6>
+          {% for label, value in beer.flavor_profile %}
+          {% endfor %}
+          {% with flavors="Bitter,Sweet,Sour,Malty,Hoppy,Fruits,Spices,Body" %}
+            {% for f in flavors|stringformat:"s"|slice:":0" %}{% endfor %}
+          {% endwith %}
+          <div class="row">
+            <div class="col-6 mb-2"><small>Bitter</small><div class="flavor-bar"><div class="flavor-bar-fill" style="width: {{ beer.bitter }}%;"></div></div></div>
+            <div class="col-6 mb-2"><small>Sweet</small><div class="flavor-bar"><div class="flavor-bar-fill" style="width: {{ beer.sweet }}%;"></div></div></div>
+            <div class="col-6 mb-2"><small>Sour</small><div class="flavor-bar"><div class="flavor-bar-fill" style="width: {{ beer.sour }}%;"></div></div></div>
+            <div class="col-6 mb-2"><small>Malty</small><div class="flavor-bar"><div class="flavor-bar-fill" style="width: {{ beer.malty }}%;"></div></div></div>
+            <div class="col-6 mb-2"><small>Hoppy</small><div class="flavor-bar"><div class="flavor-bar-fill" style="width: {{ beer.hoppy }}%;"></div></div></div>
+            <div class="col-6 mb-2"><small>Fruits</small><div class="flavor-bar"><div class="flavor-bar-fill" style="width: {{ beer.fruits }}%;"></div></div></div>
+            <div class="col-6 mb-2"><small>Spices</small><div class="flavor-bar"><div class="flavor-bar-fill" style="width: {{ beer.spices }}%;"></div></div></div>
+            <div class="col-6 mb-2"><small>Body</small><div class="flavor-bar"><div class="flavor-bar-fill" style="width: {{ beer.body }}%;"></div></div></div>
+          </div>
+        </div>
+      </div>
+
+      {% if recent_checkins %}
+        <h5 class="mb-3">Recent check-ins</h5>
+        {% for c in recent_checkins %}
+          <div class="card mb-2">
+            <div class="card-body py-2">
+              <div class="d-flex justify-content-between">
+                <strong>{{ c.user.username }}</strong>
+                <span>
+                  {% for i in "12345" %}
+                    {% if forloop.counter <= c.rating %}<span class="star">★</span>{% else %}<span class="star-empty">★</span>{% endif %}
+                  {% endfor %}
+                </span>
+              </div>
+              {% if c.notes %}<p class="mb-0 mt-1 text-muted-beer" style="font-size: 0.9rem;">{{ c.notes }}</p>{% endif %}
+              <small class="text-muted-beer">{{ c.created_at|date:"M j, Y" }}</small>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="col-md-4">
+      {% if user.is_authenticated %}
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="mb-3">{% if user_checkin %}Update your check-in{% else %}I've tried this{% endif %}</h5>
+            <form method="post" action="{% url 'checkin' beer.pk %}">
+              {% csrf_token %}
+              <label class="text-muted-beer mb-2">Rating</label>
+              <select name="rating" class="form-select mb-3">
+                {% for i in "12345" %}
+                  <option value="{{ forloop.counter }}" {% if user_checkin and user_checkin.rating == forloop.counter %}selected{% endif %}>{{ forloop.counter }} stars</option>
+                {% endfor %}
+              </select>
+              <label class="text-muted-beer mb-2">Notes</label>
+              <textarea name="notes" class="form-control mb-3" rows="3" placeholder="How was it?">{% if user_checkin %}{{ user_checkin.notes }}{% endif %}</textarea>
+              <button type="submit" class="btn btn-primary w-100">{% if user_checkin %}Update check-in{% else %}Log this beer 🍺{% endif %}</button>
+            </form>
+          </div>
+        </div>
+      {% else %}
+        <div class="card mb-4">
+          <div class="card-body text-center">
+            <p class="mb-3">Log in to check in this beer and track your journey.</p>
+            <a href="{% url 'login' %}" class="btn btn-primary">Login</a>
+            <a href="{% url 'register' %}" class="btn btn-outline-primary ms-2">Sign up</a>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if similar_beers %}
+        <h6 class="text-muted-beer mb-3">You might also like</h6>
+        {% for b in similar_beers %}
+          <a href="{% url 'beer_detail' b.pk %}" class="card mb-2 text-decoration-none">
+            <div class="card-body py-2">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <div style="color: var(--text);">{{ b.name }}</div>
+                  <small class="text-muted-beer">{{ b.brewery.name }}</small>
+                </div>
+                <small class="text-muted-beer">{{ b.abv|default:"—" }}%</small>
+              </div>
+            </div>
+          </a>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

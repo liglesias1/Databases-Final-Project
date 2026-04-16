@@ -1,0 +1,112 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}BeerPass{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+  <style>
+    :root {
+      --bg: #14100d;
+      --bg-2: #1d1814;
+      --card: #2a231d;
+      --accent: #f4a32a;
+      --accent-2: #ff7a2b;
+      --text: #f2ead6;
+      --muted: #a39582;
+      --border: #3a3029;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-2); }
+    .navbar-brand { font-weight: 800; letter-spacing: -0.5px; font-size: 1.4rem; color: var(--accent) !important; }
+    .navbar { background: var(--bg-2) !important; border-bottom: 1px solid var(--border); }
+    .nav-link { color: var(--text) !important; }
+    .nav-link:hover { color: var(--accent) !important; }
+    .card { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+    .card:hover { border-color: var(--accent); transition: border-color 0.2s; }
+    .form-control, .form-select { background: var(--bg-2); color: var(--text); border: 1px solid var(--border); }
+    .form-control:focus, .form-select:focus { background: var(--bg-2); color: var(--text); border-color: var(--accent); box-shadow: none; }
+    .btn-primary { background: var(--accent); border: none; color: #14100d; font-weight: 600; }
+    .btn-primary:hover { background: var(--accent-2); color: #14100d; }
+    .btn-outline-primary { border-color: var(--accent); color: var(--accent); }
+    .btn-outline-primary:hover { background: var(--accent); color: #14100d; }
+    .badge-style { background: var(--bg); color: var(--accent); border: 1px solid var(--accent); font-weight: 500; }
+    .badge-tried { background: var(--accent); color: #14100d; }
+    .text-muted-beer { color: var(--muted) !important; }
+    .beer-card { transition: transform 0.15s; }
+    .beer-card:hover { transform: translateY(-2px); }
+    .stat-block { padding: 1.5rem; background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
+    .stat-number { font-size: 2.2rem; font-weight: 800; color: var(--accent); }
+    .stat-label { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
+    .flavor-bar { background: var(--bg); height: 6px; border-radius: 3px; overflow: hidden; }
+    .flavor-bar-fill { background: linear-gradient(90deg, var(--accent-2), var(--accent)); height: 100%; }
+    .progress { background: var(--bg); height: 8px; }
+    .progress-bar { background: var(--accent); }
+    .star { color: var(--accent); }
+    .star-empty { color: var(--border); }
+    footer { padding: 2rem 0; border-top: 1px solid var(--border); margin-top: 4rem; color: var(--muted); font-size: 0.9rem; }
+    .hero {
+      background: linear-gradient(135deg, var(--bg-2) 0%, var(--card) 100%);
+      padding: 3rem 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg">
+    <div class="container">
+      <a class="navbar-brand" href="{% url 'beer_list' %}">🍺 BeerPass</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMenu">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="{% url 'beer_list' %}">Beers</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'style_list' %}">Styles</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'leaderboard' %}">Leaderboard</a></li>
+        </ul>
+        <ul class="navbar-nav">
+          {% if user.is_authenticated %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'profile' %}">Profile ({{ user.username }})</a></li>
+            <li class="nav-item">
+              <form method="post" action="{% url 'logout' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link nav-link">Logout</button>
+              </form>
+            </li>
+          {% else %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Login</a></li>
+            <li class="nav-item"><a class="nav-link btn btn-outline-primary ms-2" href="{% url 'register' %}">Sign up</a></li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  {% if messages %}
+    <div class="container mt-3">
+      {% for message in messages %}
+        <div class="alert alert-info">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% block content %}{% endblock %}
+
+  <footer>
+    <div class="container">
+      BeerPass — Goodreads for beer. Built with Django. Data: OpenBeer & BJCP.
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

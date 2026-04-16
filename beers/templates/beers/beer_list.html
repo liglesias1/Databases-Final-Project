@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Discover Beer — BeerPass{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <div class="container">
+    <h1 class="display-5 fw-bold mb-2">Every beer in the world. One passport.</h1>
+    <p class="lead text-muted-beer mb-0">Discover, log, and rate beers. Climb the leaderboard. Complete challenges.</p>
+  </div>
+</div>
+
+<div class="container">
+  <form method="get" class="row g-2 mb-4">
+    <div class="col-md-4">
+      <input type="text" name="q" class="form-control" placeholder="Search beer, brewery, or style..." value="{{ q }}" />
+    </div>
+    <div class="col-md-3">
+      <select name="style" class="form-select">
+        <option value="">All styles</option>
+        {% for s in styles %}
+          <option value="{{ s.id }}" {% if s.id|stringformat:"s" == style_id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <input type="number" step="0.1" name="min_abv" class="form-control" placeholder="Min ABV" value="{{ min_abv }}" />
+    </div>
+    <div class="col-md-2">
+      <input type="number" step="0.1" name="max_abv" class="form-control" placeholder="Max ABV" value="{{ max_abv }}" />
+    </div>
+    <div class="col-md-1">
+      <button type="submit" class="btn btn-primary w-100">Go</button>
+    </div>
+  </form>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <span class="text-muted-beer">{{ beers.paginator.count }} beers found</span>
+    <select name="sort" class="form-select form-select-sm" style="width: auto;" onchange="window.location.href='?sort='+this.value+'&q={{ q }}&style={{ style_id }}'">
+      <option value="name" {% if sort == "name" %}selected{% endif %}>Sort by name</option>
+      <option value="rating" {% if sort == "rating" %}selected{% endif %}>Sort by rating</option>
+      <option value="abv" {% if sort == "abv" %}selected{% endif %}>Sort by ABV</option>
+      <option value="bitter" {% if sort == "bitter" %}selected{% endif %}>Sort by bitterness</option>
+    </select>
+  </div>
+
+  <div class="row">
+    {% for beer in beers %}
+      <div class="col-md-6 col-lg-4 mb-4">
+        <a href="{% url 'beer_detail' beer.pk %}" class="text-decoration-none">
+          <div class="card beer-card h-100">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h5 class="card-title mb-0" style="color: var(--text);">{{ beer.name }}</h5>
+                {% if beer.id in tried_ids %}
+                  <span class="badge badge-tried">✓ Tried</span>
+                {% endif %}
+              </div>
+              <p class="text-muted-beer mb-2" style="font-size: 0.9rem;">{{ beer.brewery.name }}</p>
+              <span class="badge badge-style mb-2">{{ beer.style.name }}</span>
+              <div class="d-flex justify-content-between mt-3">
+                <small class="text-muted-beer">ABV: <strong style="color: var(--text);">{{ beer.abv|default:"—" }}%</strong></small>
+                <small class="text-muted-beer">IBU: <strong style="color: var(--text);">{{ beer.ibu_range }}</strong></small>
+                <small class="text-muted-beer">★ <strong style="color: var(--accent);">{{ beer.avg_rating|floatformat:2|default:"—" }}</strong></small>
+              </div>
+            </div>
+          </div>
+        </a>
+      </div>
+    {% empty %}
+      <div class="col-12 text-center py-5">
+        <p class="text-muted-beer">No beers match your filters.</p>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if beers.has_other_pages %}
+    <nav class="mt-4">
+      <ul class="pagination justify-content-center">
+        {% if beers.has_previous %}
+          <li class="page-item"><a class="page-link bg-transparent" style="border-color: var(--border); color: var(--accent);" href="?page={{ beers.previous_page_number }}&q={{ q }}&style={{ style_id }}&sort={{ sort }}">Previous</a></li>
+        {% endif %}
+        <li class="page-item"><span class="page-link bg-transparent" style="border-color: var(--border); color: var(--text);">Page {{ beers.number }} of {{ beers.paginator.num_pages }}</span></li>
+        {% if beers.has_next %}
+          <li class="page-item"><a class="page-link bg-transparent" style="border-color: var(--border); color: var(--accent);" href="?page={{ beers.next_page_number }}&q={{ q }}&style={{ style_id }}&sort={{ sort }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  {% endif %}
+</div>
+{% endblock %}

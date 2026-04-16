@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Beer Styles — BeerPass{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <div class="container">
+    <h1 class="display-5 fw-bold">Beer Styles</h1>
+    <p class="lead text-muted-beer mb-0">Every major style, grouped by family.</p>
+  </div>
+</div>
+
+<div class="container">
+  {% for family, styles in families %}
+    <h3 class="mt-4 mb-3">{{ family }}</h3>
+    <div class="row">
+      {% for s in styles %}
+        <div class="col-md-4 col-lg-3 mb-3">
+          <a href="{% url 'style_detail' s.pk %}" class="card text-decoration-none beer-card h-100">
+            <div class="card-body">
+              <strong style="color: var(--text);">{{ s.name }}</strong>
+              <div><small class="text-muted-beer">{{ s.n }} beer{{ s.n|pluralize }}</small></div>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
