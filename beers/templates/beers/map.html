@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Consumption Map{% endblock %}
+
+{% block content %}
+<div class="hero" style="padding: var(--sp-4) 0; margin-bottom: 0;">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div>
+        <h1 class="display-5 fw-bold mb-1" style="font-size: var(--text-xl);">Consumption Map</h1>
+        <span class="text-muted-beer" style="font-size: var(--text-sm);">
+          {{ stats.total_countries }} countries
+          &middot; {{ stats.total_breweries }} breweries
+          &middot; {{ stats.total_checkins }} check-ins
+        </span>
+      </div>
+      <div class="d-flex gap-2 align-items-center">
+        {% if user.is_authenticated %}
+        <select id="viewMode" class="form-select" style="width: auto; height: 32px; font-size: var(--text-sm);">
+          <option value="all">All users</option>
+          <option value="mine">My consumption</option>
+        </select>
+        {% endif %}
+        <select id="styleFilter" class="form-select" style="width: auto; height: 32px; font-size: var(--text-sm);">
+          <option value="">All styles</option>
+          {% for s in styles %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="map" style="height: calc(100vh - 180px); width: 100%; background: var(--bg-0);"></div>
+
+<!-- Leaflet CSS + JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<style>
+  #map {
+    border-top: 1px solid var(--border);
+  }
+  .leaflet-container { background: var(--bg-0) !important; }
+  .brewery-popup {
+    font-family: var(--font);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .brewery-popup strong { color: #1a1a1a; }
+  .brewery-popup .stat { color: #666; font-size: 12px; }
+  .leaflet-control-zoom a {
+    background: var(--bg-1) !important;
+    color: var(--fg) !important;
+    border-color: var(--border) !important;
+  }
+</style>
+
+<script>
+  // Data from Django view
+  const allHeatData = {{ heatmap_data|safe }};
+  const myHeatData = {{ my_heatmap_data|safe }};
+  const breweryMarkers = {{ brewery_markers|safe }};
+
+  // Init map
+  const map = L.map('map', {
+    zoomControl: true,
+    scrollWheelZoom: true,
+  }).setView([30, 0], 3);
+
+  // Dark tile layer
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19,
+  }).addTo(map);
+
+  // Heatmap layer
+  let heatLayer = L.heatLayer(allHeatData, {
+    radius: 30,
+    blur: 20,
+    maxZoom: 10,
+    max: Math.max(...allHeatData.map(d => d[2]), 1),
+    gradient: {
+      0.0: '#1a1a2e',
+      0.2: '#16213e',
+      0.4: '#0f3460',
+      0.6: '#e94560',
+      0.8: '#f59e0b',
+      1.0: '#ffffff',
+    },
+  }).addTo(map);
+
+  // Brewery markers (hidden by default, shown on zoom)
+  const markerGroup = L.layerGroup();
+  breweryMarkers.forEach(b => {
+    if (b.lat && b.lng) {
+      const marker = L.circleMarker([b.lat, b.lng], {
+        radius: Math.min(3 + b.checkins * 0.5, 12),
+        fillColor: '#f59e0b',
+        color: 'rgba(245, 158, 11, 0.4)',
+        weight: 1,
+        fillOpacity: 0.8,
+      });
+      marker.bindPopup(`
+        <div class="brewery-popup">
+          <strong>${b.name}</strong><br>
+          <span class="stat">${b.city ? b.city + ', ' : ''}${b.country}</span><br>
+          <span class="stat">${b.beers} beer${b.beers !== 1 ? 's' : ''} &middot; ${b.checkins} check-in${b.checkins !== 1 ? 's' : ''}</span>
+          ${b.top_beer ? '<br><span class="stat">Top: ' + b.top_beer + '</span>' : ''}
+        </div>
+      `);
+      markerGroup.addLayer(marker);
+    }
+  });
+
+  // Show markers when zoomed in enough
+  map.on('zoomend', function() {
+    if (map.getZoom() >= 5) {
+      map.addLayer(markerGroup);
+    } else {
+      map.removeLayer(markerGroup);
+    }
+  });
+
+  // View mode toggle
+  const viewSelect = document.getElementById('viewMode');
+  if (viewSelect) {
+    viewSelect.addEventListener('change', function() {
+      const data = this.value === 'mine' ? myHeatData : allHeatData;
+      map.removeLayer(heatLayer);
+      heatLayer = L.heatLayer(data, {
+        radius: 30,
+        blur: 20,
+        maxZoom: 10,
+        max: Math.max(...data.map(d => d[2]), 1),
+        gradient: {
+          0.0: '#1a1a2e',
+          0.2: '#16213e',
+          0.4: '#0f3460',
+          0.6: '#e94560',
+          0.8: '#f59e0b',
+          1.0: '#ffffff',
+        },
+      }).addTo(map);
+    });
+  }
+
+  // Style filter
+  document.getElementById('styleFilter').addEventListener('change', function() {
+    const styleId = this.value;
+    const viewMode = viewSelect ? viewSelect.value : 'all';
+
+    fetch(`/map/data/?view=${viewMode}&style=${styleId}`)
+      .then(r => r.json())
+      .then(data => {
+        map.removeLayer(heatLayer);
+        heatLayer = L.heatLayer(data.heatmap, {
+          radius: 30,
+          blur: 20,
+          maxZoom: 10,
+          max: Math.max(...data.heatmap.map(d => d[2]), 1),
+          gradient: {
+            0.0: '#1a1a2e',
+            0.2: '#16213e',
+            0.4: '#0f3460',
+            0.6: '#e94560',
+            0.8: '#f59e0b',
+            1.0: '#ffffff',
+          },
+        }).addTo(map);
+      });
+  });
+</script>
+{% endblock %}

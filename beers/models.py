@@ -1,7 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models import Sum
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
+from datetime import timedelta
 
 
 class BeerStyle(models.Model):
@@ -44,7 +47,6 @@ class Beer(models.Model):
     avg_rating = models.FloatField(null=True, blank=True)
     description = models.TextField(blank=True)
 
-    # Flavor profile dimensions (0-100)
     astringency = models.IntegerField(default=0)
     body = models.IntegerField(default=0)
     alcohol = models.IntegerField(default=0)
@@ -85,8 +87,21 @@ class UserProfile(models.Model):
         return self.user.checkins.count()
 
     @property
+    def total_drinks(self):
+        result = self.user.checkins.aggregate(total=Sum("quantity"))
+        return result["total"] or 0
+
+    @property
+    def unique_beers(self):
+        return self.user.checkins.values("beer").distinct().count()
+
+    @property
     def unique_styles(self):
         return self.user.checkins.values("beer__style").distinct().count()
+
+    @property
+    def unique_breweries(self):
+        return self.user.checkins.values("beer__brewery").distinct().count()
 
     @property
     def unique_countries(self):
@@ -96,6 +111,22 @@ class UserProfile(models.Model):
             .distinct()
             .count()
         )
+
+    @property
+    def current_streak(self):
+        return compute_current_streak(self.user)
+
+    @property
+    def longest_streak(self):
+        return compute_longest_streak(self.user)
+
+    @property
+    def following_count(self):
+        return self.user.following.count()
+
+    @property
+    def followers_count(self):
+        return self.user.followers.count()
 
 
 @receiver(post_save, sender=User)
@@ -110,6 +141,7 @@ class CheckIn(models.Model):
     rating = models.IntegerField(
         choices=[(i, f"{i} stars") for i in range(1, 6)], default=3
     )
+    quantity = models.IntegerField(default=1)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -117,7 +149,7 @@ class CheckIn(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.user.username} - {self.beer.name} ({self.rating}★)"
+        return f"{self.user.username} - {self.beer.name} ({self.rating}*)"
 
 
 class Challenge(models.Model):
@@ -127,20 +159,117 @@ class Challenge(models.Model):
     required_style = models.ForeignKey(
         BeerStyle, null=True, blank=True, on_delete=models.SET_NULL
     )
-    icon = models.CharField(max_length=10, default="🍺")
+    icon = models.CharField(max_length=10, default="")
 
     def __str__(self):
         return self.name
 
     def progress_for(self, user):
-        """Return (current_count, required_count) for a user."""
         qs = CheckIn.objects.filter(user=user)
         if self.required_style:
             qs = qs.filter(beer__style=self.required_style)
-        # Count distinct beers
         current = qs.values("beer").distinct().count()
         return min(current, self.required_count), self.required_count
 
     def is_completed_for(self, user):
         current, required = self.progress_for(user)
         return current >= required
+
+
+class Follow(models.Model):
+    follower = models.ForeignKey(User, on_delete=models.CASCADE, related_name="following")
+    followed = models.ForeignKey(User, on_delete=models.CASCADE, related_name="followers")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("follower", "followed")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.follower.username} -> {self.followed.username}"
+
+
+class Badge(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField()
+    icon = models.CharField(max_length=10, default="")
+    badge_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("beers", "Beer count"),
+            ("styles", "Style count"),
+            ("streak", "Streak"),
+            ("social", "Social"),
+        ],
+    )
+    threshold = models.IntegerField(default=1)
+
+    class Meta:
+        ordering = ["badge_type", "threshold"]
+
+    def __str__(self):
+        return f"{self.icon} {self.name}"
+
+    def is_earned_by(self, user):
+        if self.badge_type == "beers":
+            return user.checkins.values("beer").distinct().count() >= self.threshold
+        elif self.badge_type == "styles":
+            return user.checkins.values("beer__style").distinct().count() >= self.threshold
+        elif self.badge_type == "streak":
+            return compute_current_streak(user) >= self.threshold
+        elif self.badge_type == "social":
+            if "follow" in self.name.lower() or "butterfly" in self.name.lower():
+                return user.following.count() >= self.threshold
+            return user.followers.count() >= self.threshold
+        return False
+
+
+class UserBadge(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="earned_badges")
+    badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
+    earned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "badge")
+        ordering = ["-earned_at"]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.badge.name}"
+
+
+# ============================================================
+# Utility functions
+# ============================================================
+
+def compute_current_streak(user):
+    """Consecutive days with at least 1 check-in, ending today."""
+    today = timezone.now().date()
+    dates = set(user.checkins.values_list("created_at__date", flat=True))
+    streak = 0
+    day = today
+    while day in dates:
+        streak += 1
+        day -= timedelta(days=1)
+    return streak
+
+
+def compute_longest_streak(user):
+    """Longest consecutive day streak in user's history."""
+    dates = sorted(set(user.checkins.values_list("created_at__date", flat=True)))
+    if not dates:
+        return 0
+    longest = current = 1
+    for i in range(1, len(dates)):
+        if (dates[i] - dates[i - 1]).days == 1:
+            current += 1
+            longest = max(longest, current)
+        else:
+            current = 1
+    return longest
+
+
+def check_and_award_badges(user):
+    """Award any newly earned badges. Call after every check-in."""
+    for badge in Badge.objects.all():
+        if badge.is_earned_by(user):
+            UserBadge.objects.get_or_create(user=user, badge=badge)

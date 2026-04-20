@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}{{ target_user.username }}'s Passport{% endblock %}
+
+{% block content %}
+<!-- HEADER -->
+<div class="hero">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <h1 class="display-5 fw-bold mb-1">{{ target_user.username }}</h1>
+        <p class="text-muted-beer mb-2">{{ profile.bio|default:"Beer explorer." }}</p>
+        <small class="text-muted-beer">
+          {{ profile.followers_count }} follower{{ profile.followers_count|pluralize }}
+          &middot; {{ profile.following_count }} following
+          &middot; Joined {{ target_user.date_joined|date:"M Y" }}
+        </small>
+      </div>
+      {% if not is_own and user.is_authenticated %}
+        <div>
+          {% if is_following %}
+            <form method="post" action="{% url 'unfollow_user' target_user.username %}">
+              {% csrf_token %}
+              <button class="btn btn-outline-primary">Unfollow</button>
+            </form>
+          {% else %}
+            <form method="post" action="{% url 'follow_user' target_user.username %}">
+              {% csrf_token %}
+              <button class="btn btn-primary">Follow</button>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- SECTION A: STATS DASHBOARD -->
+  <div class="row mb-4">
+    <div class="col-6 col-md-3 mb-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ profile.unique_beers }}</div>
+        <div class="stat-label">Beers tried</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 mb-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ total_drinks }}</div>
+        <div class="stat-label">Total drinks</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 mb-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ styles_tried }}/{{ total_styles }}</div>
+        <div class="stat-label">Styles</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 mb-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ profile.unique_breweries }}</div>
+        <div class="stat-label">Breweries</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 mb-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ profile.current_streak }}</div>
+        <div class="stat-label">Current streak</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 mb-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ profile.longest_streak }}</div>
+        <div class="stat-label">Best streak</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 mb-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ avg_rating|floatformat:1|default:"-" }}</div>
+        <div class="stat-label">Avg rating</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 mb-3">
+      <div class="stat-block text-center">
+        <div class="stat-number">{{ profile.unique_countries }}</div>
+        <div class="stat-label">Countries</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSPORT COMPLETION BAR -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between mb-2">
+        <h5 class="mb-0">Beer Passport</h5>
+        <span class="text-muted-beer">{{ completion_pct }}% complete</span>
+      </div>
+      <div class="progress mb-1">
+        <div class="progress-bar" style="width: {{ completion_pct }}%;"></div>
+      </div>
+      <small class="text-muted-beer">{{ styles_tried }} of {{ total_styles }} styles explored</small>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-8">
+
+      <!-- SECTION B: STYLE COMPLETION GRID -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="mb-3">Style Collection</h5>
+          {% for family, entries in families_grid %}
+            <h6 class="text-muted-beer mt-3 mb-2">{{ family }}</h6>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              {% for entry in entries %}
+                <a href="{% url 'style_detail' entry.style.pk %}"
+                   class="badge {% if entry.tried %}badge-tried{% else %}badge-style{% endif %}"
+                   style="font-size: 0.8rem; padding: 5px 10px; {% if not entry.tried %}opacity: 0.4;{% endif %}"
+                   title="{{ entry.tried_count }}/{{ entry.total_count }} beers tried">
+                  {{ entry.style.name }}
+                  {% if entry.tried %}<small>({{ entry.tried_count }})</small>{% endif %}
+                </a>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- SECTION D: TIMELINE -->
+      <h5 class="mb-3">Drinking Log</h5>
+      {% for c in timeline %}
+        <a href="{% url 'beer_detail' c.beer.pk %}" class="card mb-2 text-decoration-none beer-card">
+          <div class="card-body py-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <strong style="color: var(--text);">{{ c.beer.name }}</strong>
+                {% if c.quantity > 1 %}<small class="text-muted-beer"> x{{ c.quantity }}</small>{% endif %}
+                <div><small class="text-muted-beer">{{ c.beer.brewery.name }}</small></div>
+                <span class="badge badge-style mt-1">{{ c.beer.style.name }}</span>
+              </div>
+              <div class="text-end">
+                {% for i in "12345" %}
+                  {% if forloop.counter <= c.rating %}<span class="star">*</span>{% else %}<span class="star-empty">*</span>{% endif %}
+                {% endfor %}
+                <div><small class="text-muted-beer">{{ c.created_at|date:"M j, Y" }}</small></div>
+              </div>
+            </div>
+            {% if c.notes %}<p class="mb-0 mt-2 text-muted-beer" style="font-size: 0.9rem;">"{{ c.notes }}"</p>{% endif %}
+          </div>
+        </a>
+      {% empty %}
+        <p class="text-muted-beer">No check-ins yet. <a href="{% url 'beer_list' %}">Start exploring</a></p>
+      {% endfor %}
+
+      {% if timeline.has_other_pages %}
+        <nav class="mt-3">
+          <ul class="pagination justify-content-center">
+            {% if timeline.has_previous %}
+              <li class="page-item"><a class="page-link bg-transparent" style="border-color: var(--border); color: var(--accent);" href="?page={{ timeline.previous_page_number }}">Prev</a></li>
+            {% endif %}
+            <li class="page-item"><span class="page-link bg-transparent" style="border-color: var(--border); color: var(--text);">Page {{ timeline.number }} / {{ timeline.paginator.num_pages }}</span></li>
+            {% if timeline.has_next %}
+              <li class="page-item"><a class="page-link bg-transparent" style="border-color: var(--border); color: var(--accent);" href="?page={{ timeline.next_page_number }}">Next</a></li>
+            {% endif %}
+          </ul>
+        </nav>
+      {% endif %}
+    </div>
+
+    <div class="col-md-4">
+
+      <!-- SECTION C: BADGES -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="mb-1">Badges</h5>
+          <small class="text-muted-beer d-block mb-3">{{ earned_count }} / {{ total_badges }} earned</small>
+          <div class="row g-2">
+            {% for item in badge_list %}
+              <div class="col-6">
+                <div class="stat-block text-center p-2" style="{% if not item.earned %}opacity: 0.3;{% endif %}">
+                  <div style="font-size: 1.5rem;">{{ item.badge.icon }}</div>
+                  <div style="font-size: 0.75rem; font-weight: 600; color: var(--text);">{{ item.badge.name }}</div>
+                  <div style="font-size: 0.65rem; color: var(--muted);">{{ item.badge.description }}</div>
+                  {% if item.earned %}
+                    <div style="font-size: 0.6rem; color: var(--accent);">{{ item.earned_at|date:"M j" }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- TOP STYLES -->
+      {% if style_breakdown %}
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="mb-3">Top Styles</h5>
+            {% for s in style_breakdown %}
+              <div class="d-flex justify-content-between py-2 border-bottom" style="border-color: var(--border) !important;">
+                <span style="font-size: 0.9rem;">{{ s.beer__style__name }}</span>
+                <span>
+                  <strong class="text-muted-beer">{{ s.count }}</strong>
+                  <small class="text-muted-beer">({{ s.drinks }} drinks)</small>
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

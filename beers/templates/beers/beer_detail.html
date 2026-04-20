@@ -111,6 +111,12 @@
                   <option value="{{ forloop.counter }}" {% if user_checkin and user_checkin.rating == forloop.counter %}selected{% endif %}>{{ forloop.counter }} stars</option>
                 {% endfor %}
               </select>
+              <label class="text-muted-beer mb-2">How many?</label>
+              <select name="quantity" class="form-select mb-3">
+                {% for i in "12345678" %}
+                  <option value="{{ forloop.counter }}">{{ forloop.counter }} drink{{ forloop.counter|pluralize }}</option>
+                {% endfor %}
+              </select>
               <label class="text-muted-beer mb-2">Notes</label>
               <textarea name="notes" class="form-control mb-3" rows="3" placeholder="How was it?">{% if user_checkin %}{{ user_checkin.notes }}{% endif %}</textarea>
               <button type="submit" class="btn btn-primary w-100">{% if user_checkin %}Update check-in{% else %}Log this beer 🍺{% endif %}</button>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Leaderboard — BeerPass{% endblock %}
+{% block title %}Leaderboard{% endblock %}
 
 {% block content %}
 <div class="hero">
@@ -12,13 +12,13 @@
 
 <div class="container">
   <div class="row">
-    <div class="col-md-4">
-      <div class="card">
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
         <div class="card-body">
-          <h5 class="mb-3">🍺 Most Beers Tried</h5>
+          <h5 class="mb-3">Most Beers Tried</h5>
           {% for p in top_by_count %}
             <div class="d-flex justify-content-between py-2 border-bottom" style="border-color: var(--border) !important;">
-              <span>{{ forloop.counter }}. <a href="{% url 'user_profile' p.user.username %}">{{ p.user.username }}</a></span>
+              <span>{{ forloop.counter }}. <a href="{% url 'user_passport' p.user.username %}">{{ p.user.username }}</a></span>
               <strong class="text-muted-beer">{{ p.n }}</strong>
             </div>
           {% empty %}
@@ -28,13 +28,29 @@
       </div>
     </div>
 
-    <div class="col-md-4">
-      <div class="card">
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
         <div class="card-body">
-          <h5 class="mb-3">🎨 Most Styles Explored</h5>
+          <h5 class="mb-3">Most Drinks</h5>
+          {% for p in top_by_drinks %}
+            <div class="d-flex justify-content-between py-2 border-bottom" style="border-color: var(--border) !important;">
+              <span>{{ forloop.counter }}. <a href="{% url 'user_passport' p.user.username %}">{{ p.user.username }}</a></span>
+              <strong class="text-muted-beer">{{ p.n }}</strong>
+            </div>
+          {% empty %}
+            <p class="text-muted-beer">No check-ins yet.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="mb-3">Most Styles</h5>
           {% for p in top_by_styles %}
             <div class="d-flex justify-content-between py-2 border-bottom" style="border-color: var(--border) !important;">
-              <span>{{ forloop.counter }}. <a href="{% url 'user_profile' p.user.username %}">{{ p.user.username }}</a></span>
+              <span>{{ forloop.counter }}. <a href="{% url 'user_passport' p.user.username %}">{{ p.user.username }}</a></span>
               <strong class="text-muted-beer">{{ p.n }}</strong>
             </div>
           {% empty %}
@@ -44,17 +60,33 @@
       </div>
     </div>
 
-    <div class="col-md-4">
-      <div class="card">
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
         <div class="card-body">
-          <h5 class="mb-3">🌍 Most Countries Covered</h5>
+          <h5 class="mb-3">Most Countries</h5>
           {% for p in top_by_countries %}
             <div class="d-flex justify-content-between py-2 border-bottom" style="border-color: var(--border) !important;">
-              <span>{{ forloop.counter }}. <a href="{% url 'user_profile' p.user.username %}">{{ p.user.username }}</a></span>
+              <span>{{ forloop.counter }}. <a href="{% url 'user_passport' p.user.username %}">{{ p.user.username }}</a></span>
               <strong class="text-muted-beer">{{ p.n }}</strong>
             </div>
           {% empty %}
             <p class="text-muted-beer">No check-ins yet.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="mb-3">Most Followers</h5>
+          {% for p in top_by_followers %}
+            <div class="d-flex justify-content-between py-2 border-bottom" style="border-color: var(--border) !important;">
+              <span>{{ forloop.counter }}. <a href="{% url 'user_passport' p.user.username %}">{{ p.user.username }}</a></span>
+              <strong class="text-muted-beer">{{ p.n }}</strong>
+            </div>
+          {% empty %}
+            <p class="text-muted-beer">No followers yet.</p>
           {% endfor %}
         </div>
       </div>
