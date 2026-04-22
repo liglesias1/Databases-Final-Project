@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}BeerPass Analytics{% endblock %}
+
+{% block content %}
+<div class="d-flex" style="min-height: calc(100vh - 60px);">
+  <!-- Sidebar -->
+  <nav style="width: 220px; background: var(--bg-1); border-right: 1px solid var(--border); padding: var(--sp-5) var(--sp-4); flex-shrink: 0;">
+    <div style="font-size: var(--text-xs); color: var(--fg-4); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: var(--sp-2);">
+      {{ request.manufacturer.name }}
+    </div>
+    <div style="font-size: var(--text-xs); color: var(--fg-4); margin-bottom: var(--sp-5);">
+      {{ request.manufacturer_role|title }}
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: var(--sp-1);">
+      {% if request.manufacturer_role == 'admin' or request.manufacturer_role == 'supply_chain' or request.manufacturer_role == 'sales' or request.manufacturer_role == 'executive' %}
+      <a href="{% url 'analytics:dashboard' %}"
+         class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}"
+         style="display: block; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); font-size: var(--text-sm); font-weight: 500; color: {% if active_page == 'dashboard' %}var(--accent){% else %}var(--fg-3){% endif %}; text-decoration: none; transition: all 0.15s; {% if active_page == 'dashboard' %}background: var(--accent-subtle);{% endif %}">
+        Overview
+      </a>
+      {% endif %}
+
+      {% if request.manufacturer_role != 'executive' %}
+      <a href="{% url 'analytics:demand_trends' %}"
+         class="sidebar-link {% if active_page == 'demand' %}active{% endif %}"
+         style="display: block; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); font-size: var(--text-sm); font-weight: 500; color: {% if active_page == 'demand' %}var(--accent){% else %}var(--fg-3){% endif %}; text-decoration: none; transition: all 0.15s; {% if active_page == 'demand' %}background: var(--accent-subtle);{% endif %}">
+        Demand Trends
+      </a>
+
+      <a href="{% url 'analytics:regional' %}"
+         class="sidebar-link {% if active_page == 'regional' %}active{% endif %}"
+         style="display: block; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); font-size: var(--text-sm); font-weight: 500; color: {% if active_page == 'regional' %}var(--accent){% else %}var(--fg-3){% endif %}; text-decoration: none; transition: all 0.15s; {% if active_page == 'regional' %}background: var(--accent-subtle);{% endif %}">
+        Regional
+      </a>
+
+      <a href="{% url 'analytics:styles' %}"
+         class="sidebar-link {% if active_page == 'styles' %}active{% endif %}"
+         style="display: block; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); font-size: var(--text-sm); font-weight: 500; color: {% if active_page == 'styles' %}var(--accent){% else %}var(--fg-3){% endif %}; text-decoration: none; transition: all 0.15s; {% if active_page == 'styles' %}background: var(--accent-subtle);{% endif %}">
+        Styles
+      </a>
+      {% endif %}
+
+      <a href="{% url 'analytics:projections' %}"
+         class="sidebar-link {% if active_page == 'projections' %}active{% endif %}"
+         style="display: block; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); font-size: var(--text-sm); font-weight: 500; color: {% if active_page == 'projections' %}var(--accent){% else %}var(--fg-3){% endif %}; text-decoration: none; transition: all 0.15s; {% if active_page == 'projections' %}background: var(--accent-subtle);{% endif %}">
+        Projections
+      </a>
+    </div>
+
+    <div style="margin-top: auto; padding-top: var(--sp-7);">
+      <a href="{% url 'beer_list' %}" style="font-size: var(--text-xs); color: var(--fg-4); text-decoration: none;">
+        &larr; Back to BeerPass
+      </a>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main style="flex: 1; padding: var(--sp-5); overflow-y: auto;">
+    {% block dashboard_content %}{% endblock %}
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% block extra_js %}{% endblock %}
+{% endblock %}

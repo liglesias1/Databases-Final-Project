@@ -1,0 +1,103 @@
+{% extends "analytics/base_analytics.html" %}
+
+{% block dashboard_content %}
+<div style="margin-bottom: var(--sp-5);">
+  <h2 style="font-size: var(--text-xl); margin-bottom: var(--sp-1);">Regional Analysis</h2>
+  <p style="color: var(--fg-4); font-size: var(--text-sm); margin: 0;">Geographic demand patterns by country</p>
+</div>
+
+<div class="row g-4">
+  <!-- Heatmap -->
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-body" style="padding: 0; height: 400px;">
+        <div id="regionMap" style="width: 100%; height: 100%; border-radius: var(--r-lg);"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Country bar chart -->
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-body">
+        <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+          Demand by Country
+        </h5>
+        <canvas id="countryChart" height="350"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Country table -->
+<div class="card" style="margin-top: var(--sp-4);">
+  <div class="card-body">
+    <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+      Country Breakdown
+    </h5>
+    <table style="width: 100%; font-size: var(--text-sm);">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--border-strong);">
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: left;">Country</th>
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: right;">Quantity</th>
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: right;">Check-ins</th>
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: right;">Users</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in countries %}
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: var(--sp-2) 0;">{{ c.country }}</td>
+          <td style="padding: var(--sp-2) 0; text-align: right; font-feature-settings: 'tnum';">{{ c.quantity }}</td>
+          <td style="padding: var(--sp-2) 0; text-align: right; font-feature-settings: 'tnum';">{{ c.checkins }}</td>
+          <td style="padding: var(--sp-2) 0; text-align: right; font-feature-settings: 'tnum';">{{ c.users }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script>
+  // Heatmap
+  const heatData = {{ heatmap_data|safe }};
+  const map = L.map('regionMap').setView([30, 0], 2);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; CARTO',
+    maxZoom: 18,
+  }).addTo(map);
+  if (heatData.length > 0) {
+    L.heatLayer(heatData, { radius: 20, blur: 15, maxZoom: 10 }).addTo(map);
+  }
+
+  // Country bar chart
+  const countryData = {{ chart_data_json|safe }};
+  new Chart(document.getElementById('countryChart'), {
+    type: 'bar',
+    data: {
+      labels: countryData.labels,
+      datasets: [{
+        label: 'Demand',
+        data: countryData.values,
+        backgroundColor: 'rgba(232, 160, 48, 0.6)',
+        borderColor: '#e8a030',
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8a95a5' }, grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true },
+        y: { ticks: { color: '#8a95a5' }, grid: { display: false } }
+      }
+    }
+  });
+</script>
+{% endblock %}

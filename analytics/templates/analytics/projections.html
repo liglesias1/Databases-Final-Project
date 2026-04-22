@@ -1,0 +1,139 @@
+{% extends "analytics/base_analytics.html" %}
+
+{% block dashboard_content %}
+<div style="margin-bottom: var(--sp-5);">
+  <h2 style="font-size: var(--text-xl); margin-bottom: var(--sp-1);">Supply Flow Projections</h2>
+  <p style="color: var(--fg-4); font-size: var(--text-sm); margin: 0;">Month-forward demand projections based on trend analysis</p>
+</div>
+
+<!-- Confidence indicator -->
+<div class="card" style="margin-bottom: var(--sp-4);">
+  <div class="card-body" style="padding: var(--sp-3) var(--sp-4); display: flex; align-items: center; gap: var(--sp-3);">
+    <div style="width: 8px; height: 8px; border-radius: 50%; background: {% if confidence == 'high' %}var(--success){% elif confidence == 'medium' %}var(--accent){% else %}var(--danger){% endif %};"></div>
+    <span style="font-size: var(--text-sm); color: var(--fg-2);">
+      Projection confidence: <strong style="color: {% if confidence == 'high' %}var(--success){% elif confidence == 'medium' %}var(--accent){% else %}var(--danger){% endif %};">{{ confidence|upper }}</strong>
+      {% if confidence == 'low' %}
+      <span style="color: var(--fg-4);"> &mdash; More check-in data needed for reliable projections</span>
+      {% endif %}
+    </span>
+
+    <form method="get" class="ms-auto d-flex align-items-center gap-2">
+      <label class="form-label" style="margin: 0; white-space: nowrap;">Granularity</label>
+      <select name="granularity" class="form-select" style="width: 130px;" onchange="this.form.submit()">
+        <option value="week" {% if granularity == 'week' %}selected{% endif %}>Weekly</option>
+        <option value="month" {% if granularity == 'month' %}selected{% endif %}>Monthly</option>
+      </select>
+    </form>
+  </div>
+</div>
+
+<!-- Projection chart -->
+<div class="card" style="margin-bottom: var(--sp-4);">
+  <div class="card-body">
+    <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+      Demand Projection (4 periods forward)
+    </h5>
+    <canvas id="projectionChart" height="300"></canvas>
+  </div>
+</div>
+
+<!-- Per-style projections table -->
+<div class="card">
+  <div class="card-body">
+    <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+      Style Projections
+    </h5>
+    {% if style_projections %}
+    <table style="width: 100%; font-size: var(--text-sm);">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--border-strong);">
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: left;">Style</th>
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: right;">Current</th>
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: right;">Projected Avg</th>
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: right;">Trend</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sp in style_projections %}
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: var(--sp-2) 0;">{{ sp.name }}</td>
+          <td style="padding: var(--sp-2) 0; text-align: right; font-feature-settings: 'tnum';">{{ sp.current }}</td>
+          <td style="padding: var(--sp-2) 0; text-align: right; font-feature-settings: 'tnum';">{{ sp.projected_avg }}</td>
+          <td style="padding: var(--sp-2) 0; text-align: right;">
+            <span style="color: {% if sp.trend == 'up' %}var(--success){% else %}var(--danger){% endif %}; font-weight: 600;">
+              {% if sp.trend == 'up' %}&#9650;{% else %}&#9660;{% endif %}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color: var(--fg-4); font-size: var(--text-sm);">Not enough data for per-style projections.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const projData = {{ chart_data_json|safe }};
+
+  // Combine historical + projected
+  const allLabels = projData.labels.concat(projData.future_labels);
+  const historicalValues = projData.values.concat(projData.future_labels.map(() => null));
+  const projectedValues = projData.values.map(() => null);
+  // Connect projection to last historical point
+  if (projData.values.length > 0) {
+    projectedValues[projectedValues.length - 1] = projData.values[projData.values.length - 1];
+  }
+  const projLine = projectedValues.concat(projData.projected);
+
+  // Moving average (only for historical)
+  const maValues = (projData.moving_avg || []).concat(projData.future_labels.map(() => null));
+
+  new Chart(document.getElementById('projectionChart'), {
+    type: 'line',
+    data: {
+      labels: allLabels,
+      datasets: [{
+        label: 'Historical',
+        data: historicalValues,
+        borderColor: '#e8a030',
+        backgroundColor: 'rgba(232, 160, 48, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: '#e8a030',
+      }, {
+        label: 'Projected',
+        data: projLine,
+        borderColor: '#60a5fa',
+        backgroundColor: 'rgba(96, 165, 250, 0.1)',
+        borderDash: [6, 3],
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: '#60a5fa',
+        pointStyle: 'triangle',
+      }, {
+        label: 'Moving Avg',
+        data: maValues,
+        borderColor: '#34d399',
+        borderDash: [3, 3],
+        fill: false,
+        tension: 0.3,
+        pointRadius: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#e8ecf1' } } },
+      scales: {
+        x: { ticks: { color: '#8a95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+        y: { ticks: { color: '#8a95a5' }, grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true }
+      }
+    }
+  });
+</script>
+{% endblock %}

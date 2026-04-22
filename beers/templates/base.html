@@ -393,6 +393,9 @@
             <li class="nav-item"><a class="nav-link" href="{% url 'activity_feed' %}">Feed</a></li>
           {% endif %}
           <li class="nav-item"><a class="nav-link" href="{% url 'user_search' %}">People</a></li>
+          {% if user.is_authenticated and user.manufacturer_memberships.exists %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'analytics:dashboard' %}" style="color: var(--success) !important;">Analytics</a></li>
+          {% endif %}
         </ul>
         <ul class="navbar-nav">
           {% if user.is_authenticated %}

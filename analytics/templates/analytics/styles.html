@@ -1,0 +1,126 @@
+{% extends "analytics/base_analytics.html" %}
+
+{% block dashboard_content %}
+<div style="margin-bottom: var(--sp-5);">
+  <h2 style="font-size: var(--text-xl); margin-bottom: var(--sp-1);">Style Analysis</h2>
+  <p style="color: var(--fg-4); font-size: var(--text-sm); margin: 0;">Demand ranking and flavor profile comparison</p>
+</div>
+
+<div class="row g-4">
+  <!-- Style ranking bar chart -->
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-body">
+        <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+          Styles by Demand
+        </h5>
+        <canvas id="styleRankChart" height="400"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flavor radar -->
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-body">
+        <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+          Flavor Profile (Top 5)
+        </h5>
+        <canvas id="flavorRadar" height="350"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Style detail table -->
+<div class="card" style="margin-top: var(--sp-4);">
+  <div class="card-body">
+    <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+      Style Detail
+    </h5>
+    <table style="width: 100%; font-size: var(--text-sm);">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--border-strong);">
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: left;">Style</th>
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: right;">Total Qty</th>
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: right;">Check-ins</th>
+          <th style="padding: var(--sp-2) 0; color: var(--fg-3); font-weight: 600; text-align: right;">Avg Rating</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in styles %}
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: var(--sp-2) 0;">{{ s.style__name }}</td>
+          <td style="padding: var(--sp-2) 0; text-align: right; font-feature-settings: 'tnum';">{{ s.total_quantity }}</td>
+          <td style="padding: var(--sp-2) 0; text-align: right; font-feature-settings: 'tnum';">{{ s.total_checkins }}</td>
+          <td style="padding: var(--sp-2) 0; text-align: right; font-feature-settings: 'tnum';">{% if s.avg_rating %}{{ s.avg_rating|floatformat:1 }}{% else %}-{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const styleData = {{ chart_data_json|safe }};
+
+  // Horizontal bar chart
+  new Chart(document.getElementById('styleRankChart'), {
+    type: 'bar',
+    data: {
+      labels: styleData.labels,
+      datasets: [{
+        label: 'Total Demand',
+        data: styleData.values,
+        backgroundColor: 'rgba(232, 160, 48, 0.6)',
+        borderColor: '#e8a030',
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8a95a5' }, grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true },
+        y: { ticks: { color: '#8a95a5', font: { size: 11 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Radar chart for flavor profiles
+  const profiles = styleData.flavor_profiles;
+  const flavorLabels = styleData.flavor_labels.map(l => l.charAt(0).toUpperCase() + l.slice(1));
+  const colors = ['#e8a030', '#34d399', '#f87171', '#60a5fa', '#a78bfa'];
+  const profileNames = Object.keys(profiles);
+
+  const radarDatasets = profileNames.map((name, i) => ({
+    label: name,
+    data: styleData.flavor_labels.map(f => profiles[name][f] || 0),
+    borderColor: colors[i % colors.length],
+    backgroundColor: colors[i % colors.length] + '22',
+    pointBackgroundColor: colors[i % colors.length],
+    pointRadius: 2,
+  }));
+
+  new Chart(document.getElementById('flavorRadar'), {
+    type: 'radar',
+    data: { labels: flavorLabels, datasets: radarDatasets },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#e8ecf1', font: { size: 10 } } } },
+      scales: {
+        r: {
+          angleLines: { color: 'rgba(255,255,255,0.06)' },
+          grid: { color: 'rgba(255,255,255,0.06)' },
+          pointLabels: { color: '#8a95a5', font: { size: 11 } },
+          ticks: { color: '#8a95a5', backdropColor: 'transparent' },
+          beginAtZero: true,
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}

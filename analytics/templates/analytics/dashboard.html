@@ -1,0 +1,118 @@
+{% extends "analytics/base_analytics.html" %}
+
+{% block dashboard_content %}
+<div style="margin-bottom: var(--sp-5);">
+  <h2 style="font-size: var(--text-xl); margin-bottom: var(--sp-1);">Overview</h2>
+  <p style="color: var(--fg-4); font-size: var(--text-sm); margin: 0;">Market demand signals from consumer check-ins</p>
+</div>
+
+<!-- KPI Row -->
+<div class="row g-3" style="margin-bottom: var(--sp-5);">
+  <div class="col-6 col-md-3">
+    <div class="stat-block">
+      <div class="stat-number">{{ kpis.demand }}</div>
+      <div class="stat-label">Demand (qty)</div>
+      {% if kpis.demand_delta %}
+      <div style="font-size: var(--text-xs); margin-top: var(--sp-1); color: {% if kpis.demand_delta > 0 %}var(--success){% else %}var(--danger){% endif %};">
+        {% if kpis.demand_delta > 0 %}+{% endif %}{{ kpis.demand_delta }}% WoW
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-block">
+      <div class="stat-number">{{ kpis.consumers }}</div>
+      <div class="stat-label">Consumers</div>
+      {% if kpis.consumers_delta %}
+      <div style="font-size: var(--text-xs); margin-top: var(--sp-1); color: {% if kpis.consumers_delta > 0 %}var(--success){% else %}var(--danger){% endif %};">
+        {% if kpis.consumers_delta > 0 %}+{% endif %}{{ kpis.consumers_delta }}% WoW
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-block">
+      <div class="stat-number">{{ kpis.avg_rating }}</div>
+      <div class="stat-label">Avg Rating</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-block">
+      <div class="stat-number">{{ kpis.checkins }}</div>
+      <div class="stat-label">Check-ins</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Sparkline chart -->
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-body">
+        <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+          Weekly Demand Trend
+        </h5>
+        <canvas id="sparklineChart" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trending styles -->
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-body">
+        <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+          Trending Styles
+        </h5>
+        {% if trending_styles %}
+        {% for style in trending_styles %}
+        <div class="list-item">
+          <div>
+            <div style="font-size: var(--text-sm); font-weight: 600;">{{ style.name }}</div>
+            <div style="font-size: var(--text-xs); color: var(--fg-4);">{{ style.current }} units this week</div>
+          </div>
+          <div style="font-size: var(--text-sm); font-weight: 600; color: {% if style.growth > 0 %}var(--success){% else %}var(--danger){% endif %};">
+            {% if style.growth > 0 %}+{% endif %}{{ style.growth_pct }}%
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p style="color: var(--fg-4); font-size: var(--text-sm);">Not enough data yet. Run <code>manage.py refresh_analytics</code> after check-ins accumulate.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const sparkData = {{ sparkline_data|safe }};
+  if (sparkData.length > 0) {
+    new Chart(document.getElementById('sparklineChart'), {
+      type: 'line',
+      data: {
+        labels: sparkData.map((_, i) => 'W' + (i + 1)),
+        datasets: [{
+          label: 'Demand',
+          data: sparkData,
+          borderColor: '#e8a030',
+          backgroundColor: 'rgba(232, 160, 48, 0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointBackgroundColor: '#e8a030',
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8a95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { ticks: { color: '#8a95a5' }, grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}

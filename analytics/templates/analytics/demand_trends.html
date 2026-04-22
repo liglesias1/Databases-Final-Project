@@ -1,0 +1,124 @@
+{% extends "analytics/base_analytics.html" %}
+
+{% block dashboard_content %}
+<div style="margin-bottom: var(--sp-5);">
+  <h2 style="font-size: var(--text-xl); margin-bottom: var(--sp-1);">Demand Trends</h2>
+  <p style="color: var(--fg-4); font-size: var(--text-sm); margin: 0;">Check-in volume over time with moving average</p>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom: var(--sp-4);">
+  <div class="card-body" style="padding: var(--sp-3) var(--sp-4);">
+    <form method="get" class="d-flex align-items-center gap-3 flex-wrap">
+      <div>
+        <label class="form-label" style="margin-bottom: 2px;">Granularity</label>
+        <select name="granularity" class="form-select" style="width: 140px;" onchange="this.form.submit()">
+          <option value="week" {% if granularity == 'week' %}selected{% endif %}>Weekly</option>
+          <option value="month" {% if granularity == 'month' %}selected{% endif %}>Monthly</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" style="margin-bottom: 2px;">Style</label>
+        <select name="style_id" class="form-select" style="width: 200px;" onchange="this.form.submit()">
+          <option value="">All styles</option>
+          {% for s in styles %}
+          <option value="{{ s.id }}" {% if selected_style == s.id|stringformat:"d" %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Main chart -->
+<div class="card" style="margin-bottom: var(--sp-4);">
+  <div class="card-body">
+    <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+      Check-in Volume
+    </h5>
+    <canvas id="demandChart" height="300"></canvas>
+  </div>
+</div>
+
+<!-- Style breakdown -->
+{% if chart_data.style_breakdown %}
+<div class="card">
+  <div class="card-body">
+    <h5 style="font-size: var(--text-sm); color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--sp-4);">
+      Demand by Style Family
+    </h5>
+    <canvas id="stackedChart" height="250"></canvas>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const chartData = {{ chart_data_json|safe }};
+
+  // Main demand line chart
+  new Chart(document.getElementById('demandChart'), {
+    type: 'line',
+    data: {
+      labels: chartData.labels,
+      datasets: [{
+        label: 'Check-in Volume',
+        data: chartData.values,
+        borderColor: '#e8a030',
+        backgroundColor: 'rgba(232, 160, 48, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: '#e8a030',
+      }, {
+        label: '4-Period Moving Avg',
+        data: chartData.moving_avg,
+        borderColor: '#34d399',
+        borderDash: [5, 5],
+        fill: false,
+        tension: 0.3,
+        pointRadius: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#e8ecf1' } } },
+      scales: {
+        x: { ticks: { color: '#8a95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+        y: { ticks: { color: '#8a95a5' }, grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true }
+      }
+    }
+  });
+
+  // Stacked area chart
+  const breakdown = chartData.style_breakdown;
+  if (breakdown && Object.keys(breakdown).length > 0) {
+    const families = Object.keys(breakdown);
+    const colors = ['#e8a030', '#34d399', '#f87171', '#60a5fa', '#a78bfa', '#fb923c', '#38bdf8', '#f472b6'];
+    const allLabels = chartData.labels;
+
+    const datasets = families.map((family, i) => ({
+      label: family,
+      data: allLabels.map(l => breakdown[family][l] || 0),
+      backgroundColor: colors[i % colors.length] + '33',
+      borderColor: colors[i % colors.length],
+      fill: true,
+      tension: 0.3,
+    }));
+
+    new Chart(document.getElementById('stackedChart'), {
+      type: 'line',
+      data: { labels: allLabels, datasets: datasets },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#e8ecf1' } } },
+        scales: {
+          x: { ticks: { color: '#8a95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { stacked: true, ticks: { color: '#8a95a5' }, grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}
