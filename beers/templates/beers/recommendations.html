@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Recommended for You — BeerPass{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <div class="container">
+    <h1 class="display-5 fw-bold mb-2">Recommended for you</h1>
+    <p class="lead text-muted-beer mb-0">Based on the styles you rate highest, here's what to try next.</p>
+  </div>
+</div>
+
+<div class="container">
+  {% if recommendations %}
+    <h4 class="mb-3">Beers you'll love</h4>
+    <div class="row">
+      {% for beer in recommendations %}
+        <div class="col-md-6 col-lg-4 mb-4">
+          <a href="{% url 'beer_detail' beer.pk %}" class="text-decoration-none">
+            <div class="card beer-card h-100">
+              <div class="card-body">
+                <h5 class="card-title mb-1" style="color: var(--fg);">{{ beer.name }}</h5>
+                <p class="text-muted-beer mb-2" style="font-size: 0.9rem;">{{ beer.brewery.name }}</p>
+                <span class="badge badge-style mb-2">{{ beer.style.name }}</span>
+                <div class="d-flex justify-content-between mt-3">
+                  <small class="text-muted-beer">ABV: <strong style="color: var(--fg);">{{ beer.abv|default:"—" }}%</strong></small>
+                  <small class="text-muted-beer">IBU: <strong style="color: var(--fg);">{{ beer.ibu_range }}</strong></small>
+                  <small class="text-muted-beer">★ <strong style="color: var(--accent);">{{ beer.avg_rating|floatformat:2|default:"—" }}</strong></small>
+                </div>
+              </div>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-center py-5">
+      <p class="text-muted-beer">Log some beers to get personalized recommendations.</p>
+      <a href="{% url 'beer_list' %}" class="btn btn-primary">Browse catalog</a>
+    </div>
+  {% endif %}
+
+  {% if trending %}
+    <h4 class="mt-5 mb-3">Trending this month</h4>
+    <div class="row">
+      {% for beer in trending %}
+        <div class="col-md-6 col-lg-4 mb-4">
+          <a href="{% url 'beer_detail' beer.pk %}" class="text-decoration-none">
+            <div class="card beer-card h-100">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                  <h5 class="card-title mb-0" style="color: var(--fg);">{{ beer.name }}</h5>
+                  <span class="badge" style="background: rgba(52, 211, 153, 0.15); color: var(--success); font-size: var(--text-xs);">{{ beer.recent_checkins }} check-ins</span>
+                </div>
+                <p class="text-muted-beer mb-2" style="font-size: 0.9rem;">{{ beer.brewery.name }}</p>
+                <span class="badge badge-style">{{ beer.style.name }}</span>
+              </div>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

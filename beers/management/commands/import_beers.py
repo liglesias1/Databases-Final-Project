@@ -8,10 +8,13 @@ Usage:
 """
 
 import csv
+import logging
 from pathlib import Path
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from beers.models import Beer, BeerStyle, Brewery, Challenge
+
+logger = logging.getLogger(__name__)
 
 
 # Map style names to their family (Ale, Lager, Stout, etc.)
@@ -77,6 +80,13 @@ def detect_family(style_name):
     return "Other"
 
 
+def normalize_name(value):
+    """Strip whitespace and collapse internal spaces."""
+    if not value:
+        return ""
+    return " ".join(value.split())
+
+
 def parse_int(value, default=0):
     if value is None or value == "":
         return default
@@ -120,7 +130,7 @@ class Command(BaseCommand):
             Path(__file__).resolve().parent.parent.parent / "beer_profile_and_ratings.csv"
         )
         if not csv_path.exists():
-            self.stderr.write(f"CSV not found at {csv_path}")
+            self.stderr.write(self.style.ERROR(f"CSV not found at {csv_path}"))
             return
 
         if fresh:
@@ -129,45 +139,46 @@ class Command(BaseCommand):
             Brewery.objects.all().delete()
             BeerStyle.objects.all().delete()
 
+        # Pre-load caches to avoid repeated DB hits
         styles_cache = {s.name: s for s in BeerStyle.objects.all()}
         breweries_cache = {b.name: b for b in Brewery.objects.all()}
 
         imported = 0
         skipped = 0
+        malformed = 0
 
         with open(csv_path, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
-            for i, row in enumerate(reader):
+            for row_num, row in enumerate(reader, start=2):  # row 1 is header
                 if limit and imported >= limit:
                     break
 
-                name = (row.get("Name") or "").strip()
-                style_name = (row.get("Style") or "").strip()
-                brewery_name = (row.get("Brewery") or "").strip()
+                name = normalize_name(row.get("Name"))
+                style_name = normalize_name(row.get("Style"))
+                brewery_name = normalize_name(row.get("Brewery"))
 
                 if not name or not style_name or not brewery_name:
-                    skipped += 1
+                    malformed += 1
+                    logger.debug("Row %d: missing name/style/brewery, skipping", row_num)
                     continue
 
-                # Get or create style
+                # Get or create style (with cache)
                 if style_name not in styles_cache:
-                    style = BeerStyle.objects.create(
+                    style, _ = BeerStyle.objects.get_or_create(
                         name=style_name,
-                        family=detect_family(style_name),
+                        defaults={"family": detect_family(style_name)},
                     )
                     styles_cache[style_name] = style
                 style = styles_cache[style_name]
 
-                # Get or create brewery
+                # Get or create brewery (with cache)
                 if brewery_name not in breweries_cache:
-                    brewery = Brewery.objects.create(name=brewery_name)
+                    brewery, _ = Brewery.objects.get_or_create(name=brewery_name)
                     breweries_cache[brewery_name] = brewery
                 brewery = breweries_cache[brewery_name]
 
-                # Skip if exact duplicate beer exists
-                if Beer.objects.filter(
-                    name=name, brewery=brewery, style=style
-                ).exists():
+                # Skip exact duplicates
+                if Beer.objects.filter(name=name, brewery=brewery, style=style).exists():
                     skipped += 1
                     continue
 
@@ -175,7 +186,7 @@ class Command(BaseCommand):
                     name=name,
                     style=style,
                     brewery=brewery,
-                    description=(row.get("Description") or "").strip()[:2000],
+                    description=normalize_name(row.get("Description"))[:2000],
                     abv=parse_float(row.get("ABV")),
                     min_ibu=parse_int(row.get("Min IBU"), None),
                     max_ibu=parse_int(row.get("Max IBU"), None),
@@ -199,7 +210,8 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Done. Imported {imported} beers ({skipped} skipped). "
+                f"Done. Imported {imported} beers "
+                f"({skipped} duplicates skipped, {malformed} malformed rows). "
                 f"{BeerStyle.objects.count()} styles, "
                 f"{Brewery.objects.count()} breweries."
             )
@@ -216,14 +228,14 @@ class Command(BaseCommand):
             name="Getting Started",
             description="Log your first 5 beers.",
             required_count=5,
-            icon="🍺",
+            icon="",
         )
         Challenge.objects.create(
             name="Hop Head",
             description="Try 5 different IPAs.",
             required_count=5,
             required_style=BeerStyle.objects.filter(name__icontains="IPA").first(),
-            icon="🌿",
+            icon="",
         )
         stout = BeerStyle.objects.filter(name__icontains="stout").first()
         if stout:
@@ -232,17 +244,17 @@ class Command(BaseCommand):
                 description="Try 5 stouts.",
                 required_count=5,
                 required_style=stout,
-                icon="🖤",
+                icon="",
             )
         Challenge.objects.create(
             name="Globetrotter",
             description="Try 20 different beers.",
             required_count=20,
-            icon="🌍",
+            icon="",
         )
         Challenge.objects.create(
             name="Connoisseur",
             description="Try 50 different beers.",
             required_count=50,
-            icon="🏆",
+            icon="",
         )

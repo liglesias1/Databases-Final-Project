@@ -391,6 +391,7 @@
           <li class="nav-item"><a class="nav-link" href="{% url 'beer_map' %}">Map</a></li>
           {% if user.is_authenticated %}
             <li class="nav-item"><a class="nav-link" href="{% url 'activity_feed' %}">Feed</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'recommendations' %}">For You</a></li>
           {% endif %}
           <li class="nav-item"><a class="nav-link" href="{% url 'user_search' %}">People</a></li>
           {% if user.is_authenticated and user.manufacturer_memberships.exists %}

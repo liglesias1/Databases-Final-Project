@@ -16,6 +16,8 @@ urlpatterns = [
     path("unfollow/<str:username>/", views.unfollow_user, name="unfollow_user"),
     path("feed/", views.activity_feed, name="activity_feed"),
     path("users/", views.user_search, name="user_search"),
+    # Recommendations
+    path("recommendations/", views.recommendations, name="recommendations"),
     # Map
     path("map/", views.beer_map, name="beer_map"),
     path("map/data/", views.beer_map_data, name="beer_map_data"),

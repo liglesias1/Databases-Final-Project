@@ -10,8 +10,9 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse
 from .models import (
     Beer, BeerStyle, Brewery, CheckIn, Challenge, UserProfile,
-    Follow, Badge, UserBadge, check_and_award_badges,
+    Follow, Badge, UserBadge,
 )
+from .services import check_and_award_badges, get_recommendations, get_trending_beers
 
 
 def beer_list(request):
@@ -62,10 +63,18 @@ def beer_detail(request, pk):
     if request.user.is_authenticated:
         user_checkin = CheckIn.objects.filter(user=request.user, beer=beer).first()
     recent_checkins = beer.checkins.select_related("user").order_by("-created_at")[:10]
-    similar_beers = Beer.objects.filter(style=beer.style).exclude(pk=beer.pk)[:6]
+    similar_beers = (
+        Beer.objects.filter(style=beer.style)
+        .exclude(pk=beer.pk)
+        .select_related("brewery")
+        .order_by("-avg_rating")[:6]
+    )
+    checkin_count = beer.checkins.count()
+    avg_user_rating = beer.checkins.aggregate(avg=Avg("rating"))["avg"]
     return render(request, "beers/beer_detail.html", {
         "beer": beer, "user_checkin": user_checkin,
         "recent_checkins": recent_checkins, "similar_beers": similar_beers,
+        "checkin_count": checkin_count, "avg_user_rating": avg_user_rating,
     })
 
 
@@ -87,24 +96,25 @@ def checkin(request, beer_id):
 
 
 def leaderboard(request):
+    base = UserProfile.objects.select_related("user")
     top_by_count = (
-        UserProfile.objects.annotate(n=Count("user__checkins"))
+        base.annotate(n=Count("user__checkins"))
         .filter(n__gt=0).order_by("-n")[:20]
     )
     top_by_drinks = (
-        UserProfile.objects.annotate(n=Sum("user__checkins__quantity"))
+        base.annotate(n=Sum("user__checkins__quantity"))
         .filter(n__gt=0).order_by("-n")[:20]
     )
     top_by_styles = (
-        UserProfile.objects.annotate(n=Count("user__checkins__beer__style", distinct=True))
+        base.annotate(n=Count("user__checkins__beer__style", distinct=True))
         .filter(n__gt=0).order_by("-n")[:20]
     )
     top_by_countries = (
-        UserProfile.objects.annotate(n=Count("user__checkins__beer__brewery__country", distinct=True))
+        base.annotate(n=Count("user__checkins__beer__brewery__country", distinct=True))
         .filter(n__gt=0).order_by("-n")[:20]
     )
     top_by_followers = (
-        UserProfile.objects.annotate(n=Count("user__followers"))
+        base.annotate(n=Count("user__followers"))
         .filter(n__gt=0).order_by("-n")[:20]
     )
     return render(request, "beers/leaderboard.html", {
@@ -180,24 +190,20 @@ def passport(request, username=None):
     styles_tried = len(tried_style_ids)
     completion_pct = int((styles_tried / total_styles) * 100) if total_styles else 0
 
-    # Badges
+    # Badges — single query, dict lookup instead of nested loop
     all_badges = Badge.objects.all()
-    earned_ids = set(
-        UserBadge.objects.filter(user=target_user).values_list("badge_id", flat=True)
-    )
-    earned_badges_qs = UserBadge.objects.filter(user=target_user).select_related("badge")
-    badge_list = []
-    for badge in all_badges:
-        earned_obj = None
-        for ub in earned_badges_qs:
-            if ub.badge_id == badge.id:
-                earned_obj = ub
-                break
-        badge_list.append({
+    earned_map = {
+        ub.badge_id: ub.earned_at
+        for ub in UserBadge.objects.filter(user=target_user)
+    }
+    badge_list = [
+        {
             "badge": badge,
-            "earned": badge.id in earned_ids,
-            "earned_at": earned_obj.earned_at if earned_obj else None,
-        })
+            "earned": badge.id in earned_map,
+            "earned_at": earned_map.get(badge.id),
+        }
+        for badge in all_badges
+    ]
 
     # Timeline (paginated)
     timeline_qs = checkins.order_by("-created_at")
@@ -226,7 +232,7 @@ def passport(request, username=None):
         "families_grid": families_grid.items(),
         # Badges
         "badge_list": badge_list,
-        "earned_count": len(earned_ids),
+        "earned_count": len(earned_map),
         "total_badges": all_badges.count(),
         # Timeline
         "timeline": timeline_page,
@@ -295,6 +301,17 @@ def profile(request, username=None):
     return redirect("passport")
 
 
+@login_required
+def recommendations(request):
+    """Personalized beer recommendations based on style history."""
+    recs = get_recommendations(request.user, limit=12)
+    trending = get_trending_beers(days=30, limit=10)
+    return render(request, "beers/recommendations.html", {
+        "recommendations": recs,
+        "trending": trending,
+    })
+
+
 def register(request):
     if request.method == "POST":
         form = UserCreationForm(request.POST)
@@ -324,7 +341,7 @@ def _build_heatmap_data(checkins_qs):
 
 
 def _build_brewery_markers():
-    """Build brewery marker data with check-in counts."""
+    """Build brewery marker data with check-in counts (single query, no N+1)."""
     breweries = (
         Brewery.objects.exclude(latitude=None)
         .annotate(
@@ -334,16 +351,18 @@ def _build_brewery_markers():
         .filter(checkin_count__gt=0)
         .order_by("-checkin_count")
     )
-    markers = []
-    for b in breweries:
-        top_beer = (
-            Beer.objects.filter(brewery=b)
-            .annotate(n=Count("checkins"))
-            .order_by("-n")
-            .values_list("name", flat=True)
-            .first()
-        )
-        markers.append({
+    # Pre-fetch top beer per brewery in one query instead of N queries
+    from django.db.models import Subquery, OuterRef
+    top_beer_subq = (
+        Beer.objects.filter(brewery_id=OuterRef("id"))
+        .annotate(n=Count("checkins"))
+        .order_by("-n")
+        .values("name")[:1]
+    )
+    breweries = breweries.annotate(top_beer_name=Subquery(top_beer_subq))
+
+    return [
+        {
             "name": b.name,
             "country": b.country,
             "city": b.city,
@@ -351,9 +370,10 @@ def _build_brewery_markers():
             "lng": float(b.longitude),
             "beers": b.beer_count,
             "checkins": b.checkin_count,
-            "top_beer": top_beer or "",
-        })
-    return markers
+            "top_beer": b.top_beer_name or "",
+        }
+        for b in breweries
+    ]
 
 
 def beer_map(request):
@@ -369,16 +389,15 @@ def beer_map(request):
 
     brewery_markers = _build_brewery_markers()
 
-    stats = {
-        "total_countries": (
-            CheckIn.objects.exclude(beer__brewery__country="")
-            .values("beer__brewery__country").distinct().count()
+    agg = CheckIn.objects.aggregate(
+        total_checkins=Count("id"),
+        total_breweries=Count("beer__brewery", distinct=True),
+        total_countries=Count(
+            "beer__brewery__country", distinct=True,
+            filter=~Q(beer__brewery__country=""),
         ),
-        "total_breweries": (
-            CheckIn.objects.values("beer__brewery").distinct().count()
-        ),
-        "total_checkins": CheckIn.objects.count(),
-    }
+    )
+    stats = agg
 
     styles = BeerStyle.objects.annotate(n=Count("beers__checkins")).filter(n__gt=0).order_by("name")
 

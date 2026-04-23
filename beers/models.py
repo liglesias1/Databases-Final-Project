@@ -3,8 +3,6 @@ from django.contrib.auth.models import User
 from django.db.models import Sum
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.utils import timezone
-from datetime import timedelta
 
 
 class BeerStyle(models.Model):
@@ -76,6 +74,8 @@ class Beer(models.Model):
             models.Index(fields=["style"]),
             models.Index(fields=["brewery"]),
             models.Index(fields=["key"]),
+            models.Index(fields=["-avg_rating"]),
+            models.Index(fields=["style", "-avg_rating"]),
         ]
 
     def __str__(self):
@@ -136,11 +136,13 @@ class UserProfile(models.Model):
 
     @property
     def current_streak(self):
-        return compute_current_streak(self.user)
+        from .services import compute_current_streak as _streak
+        return _streak(self.user)
 
     @property
     def longest_streak(self):
-        return compute_longest_streak(self.user)
+        from .services import compute_longest_streak as _longest
+        return _longest(self.user)
 
     @property
     def following_count(self):
@@ -172,7 +174,18 @@ class CheckIn(models.Model):
         indexes = [
             models.Index(fields=["user"]),
             models.Index(fields=["beer"]),
+            models.Index(fields=["user", "beer"]),
             models.Index(fields=["created_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(rating__gte=1, rating__lte=5),
+                name="valid_rating",
+            ),
+            models.CheckConstraint(
+                check=models.Q(quantity__gte=1),
+                name="positive_quantity",
+            ),
         ]
 
     def __str__(self):
@@ -220,7 +233,11 @@ class Follow(models.Model):
             models.UniqueConstraint(
                 fields=["follower", "followed"],
                 name="unique_follow_relationship",
-            )
+            ),
+            models.CheckConstraint(
+                check=~models.Q(follower=models.F("followed")),
+                name="no_self_follow",
+            ),
         ]
         indexes = [
             models.Index(fields=["follower"]),
@@ -258,12 +275,14 @@ class Badge(models.Model):
         return f"{self.icon} {self.name}"
 
     def is_earned_by(self, user):
+        from .services import compute_current_streak as _streak
+
         if self.badge_type == "beers":
             return user.checkins.values("beer").distinct().count() >= self.threshold
         elif self.badge_type == "styles":
             return user.checkins.values("beer__style").distinct().count() >= self.threshold
         elif self.badge_type == "streak":
-            return compute_current_streak(user) >= self.threshold
+            return _streak(user) >= self.threshold
         elif self.badge_type == "social":
             if "follow" in self.name.lower() or "butterfly" in self.name.lower():
                 return user.following.count() >= self.threshold
@@ -282,7 +301,7 @@ class UserBadge(models.Model):
             models.UniqueConstraint(
                 fields=["user", "badge"],
                 name="unique_user_badge",
-            )
+            ),
         ]
         indexes = [
             models.Index(fields=["user"]),
@@ -294,38 +313,6 @@ class UserBadge(models.Model):
 
 
 # ============================================================
-# Utility functions
+# Re-export from services.py for backward compatibility
 # ============================================================
-
-def compute_current_streak(user):
-    """Consecutive days with at least 1 check-in, ending today."""
-    today = timezone.now().date()
-    dates = set(user.checkins.values_list("created_at__date", flat=True))
-    streak = 0
-    day = today
-    while day in dates:
-        streak += 1
-        day -= timedelta(days=1)
-    return streak
-
-
-def compute_longest_streak(user):
-    """Longest consecutive day streak in user's history."""
-    dates = sorted(set(user.checkins.values_list("created_at__date", flat=True)))
-    if not dates:
-        return 0
-    longest = current = 1
-    for i in range(1, len(dates)):
-        if (dates[i] - dates[i - 1]).days == 1:
-            current += 1
-            longest = max(longest, current)
-        else:
-            current = 1
-    return longest
-
-
-def check_and_award_badges(user):
-    """Award any newly earned badges. Call after every check-in."""
-    for badge in Badge.objects.all():
-        if badge.is_earned_by(user):
-            UserBadge.objects.get_or_create(user=user, badge=badge)
+from .services import compute_current_streak, compute_longest_streak, check_and_award_badges  # noqa: E402

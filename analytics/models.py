@@ -32,7 +32,12 @@ class ManufacturerMembership(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("user", "manufacturer")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "manufacturer"],
+                name="unique_manufacturer_membership",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.user.username} @ {self.manufacturer.name} ({self.role})"
