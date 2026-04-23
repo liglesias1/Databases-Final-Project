@@ -15,6 +15,10 @@ class BeerStyle(models.Model):
 
     class Meta:
         ordering = ["name"]
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["family"]),
+        ]
 
     def __str__(self):
         return self.name
@@ -31,6 +35,11 @@ class Brewery(models.Model):
     class Meta:
         verbose_name_plural = "Breweries"
         ordering = ["name"]
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["country"]),
+            models.Index(fields=["city"]),
+        ]
 
     def __str__(self):
         return self.name
@@ -61,6 +70,13 @@ class Beer(models.Model):
 
     class Meta:
         ordering = ["name"]
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["abv"]),
+            models.Index(fields=["style"]),
+            models.Index(fields=["brewery"]),
+            models.Index(fields=["key"]),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.brewery.name})"
@@ -78,6 +94,12 @@ class UserProfile(models.Model):
     favorite_style = models.ForeignKey(
         BeerStyle, null=True, blank=True, on_delete=models.SET_NULL
     )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["favorite_style"]),
+        ]
 
     def __str__(self):
         return self.user.username
@@ -147,6 +169,11 @@ class CheckIn(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["beer"]),
+            models.Index(fields=["created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.user.username} - {self.beer.name} ({self.rating}*)"
@@ -160,6 +187,12 @@ class Challenge(models.Model):
         BeerStyle, null=True, blank=True, on_delete=models.SET_NULL
     )
     icon = models.CharField(max_length=10, default="")
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["required_count"]),
+            models.Index(fields=["required_style"]),
+        ]
 
     def __str__(self):
         return self.name
@@ -182,8 +215,17 @@ class Follow(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("follower", "followed")
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["follower", "followed"],
+                name="unique_follow_relationship",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["follower"]),
+            models.Index(fields=["followed"]),
+        ]
 
     def __str__(self):
         return f"{self.follower.username} -> {self.followed.username}"
@@ -206,6 +248,11 @@ class Badge(models.Model):
 
     class Meta:
         ordering = ["badge_type", "threshold"]
+        indexes = [
+            models.Index(fields=["badge_type"]),
+            models.Index(fields=["threshold"]),
+            models.Index(fields=["name"]),
+        ]
 
     def __str__(self):
         return f"{self.icon} {self.name}"
@@ -230,8 +277,17 @@ class UserBadge(models.Model):
     earned_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("user", "badge")
         ordering = ["-earned_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "badge"],
+                name="unique_user_badge",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["badge"]),
+        ]
 
     def __str__(self):
         return f"{self.user.username} - {self.badge.name}"
